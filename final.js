@@ -27,25 +27,52 @@ $(document).ready(function() {
 	//Control Data
 	var forw, back, left, right, rotLeft, rotRight, up, down, boost;
 	var wasForw, wasBack, wasLeft, wasRight, wasRotLeft, wasRotRight, wasUp, wasDown;
-	var BOOST, MOVE_FB, MOVE_LR, DELTA_MOVE, ROT, DELTA_ROT, ELEV, ELEV_OFF;
+	var BOOST, MOVE_FB, MOVE_LR, DELTA_MOVE, ROT, DELTA_ROT, ELEV, DELTA_ELEV, ELEV_OFF;
 	var lastElevation;
 	
 	//Deliveries, score
 	var drops = [];
-	var toRemove;
+	var toEnable, toRemove;
 	var scoreCount = 0;
-	var NUMDROPS = 5;
+	var NUMDROPS = 10;
+	var dropIndex, dropX, dropY, dropZ, dropRadius, dropName;
+	var pkg, pkgSphere;
+	var deliver = true;
 	
 	/*****************************************************************************************************************/
 	/* GAME LOOP */
 	
 	function render() {
 		
-		/*
-		if(cam.position.y < 10) {
-			stop("OOPS! ENTER TO RESTART");
-			return;
+		//Collisions
+		if(	deliver &&
+			MOVE_FB > -5.0 &&
+			Math.abs(cam.position.x - dropX) < dropRadius &&
+			Math.abs(cam.position.y - dropY) < dropRadius + 50 &&
+			Math.abs(cam.position.z - dropZ) < dropRadius) {
+				toRemove = scene.getObjectByName(dropName);
+		        scene.remove(toRemove);
+		        drops.splice(dropIndex, 1);
+				scoreCount++;
+				score.html("Drops: " + scoreCount + "/" + NUMDROPS);
+				if(scoreCount == NUMDROPS) {
+					stop("DONE! ENTER TO RESET");
+					return;
+				}
+				newPkg();
 		}
+		else if(
+			!deliver &&
+			MOVE_FB > -5.0 &&
+			Math.abs(cam.position.x - pkg.position.x) < pkgSphere.radius &&
+			Math.abs(cam.position.y - pkg.position.y) < pkgSphere.radius &&
+			Math.abs(cam.position.z - pkg.position.z) < pkgSphere.radius) {
+				newDrop();
+		}
+		
+		/*
+		stop("OOPS! ENTER TO RESTART");
+		return;
 		*/
 		
 		//Move - Forward & Backward
@@ -61,17 +88,17 @@ $(document).ready(function() {
 		}
 		else if(forw) {
 			if(boost) {
-				if(MOVE_FB > -50.0) MOVE_FB -= 0.5;
+				if(MOVE_FB > -25.0) MOVE_FB -= 0.4;
 			}
 			else {
-				if(MOVE_FB < -10.0) MOVE_FB += 0.5;
+				if(MOVE_FB < -8.0) MOVE_FB += 0.25;
 			}
 			cam.translateZ(MOVE_FB);
-			if(MOVE_FB > -10.0) MOVE_FB -= DELTA_MOVE;
+			if(MOVE_FB > -8.0) MOVE_FB -= DELTA_MOVE;
 		}
 		else if(back) {
 			cam.translateZ(-MOVE_FB);
-			if(MOVE_FB > -10.0) MOVE_FB -= DELTA_MOVE;
+			if(MOVE_FB > -8.0) MOVE_FB -= DELTA_MOVE;
 		}
 		
 		//Move - Left & Right
@@ -107,24 +134,24 @@ $(document).ready(function() {
 		}
 		else if(rotLeft) {
 			cam.rotateY(ROT);
-			if(ROT < 0.01) ROT += DELTA_ROT;
+			if(ROT < 0.025) ROT += DELTA_ROT;
 		}
 		else if(rotRight) {
 			cam.rotateY(-ROT);
-			if(ROT < 0.01) ROT += DELTA_ROT;
+			if(ROT < 0.025) ROT += DELTA_ROT;
 		}
 		
 		//Elevation
 		if(up) {
-			if(cam.position.y > lastElevation + 50.0) up = false;
+			if(cam.position.y > lastElevation + DELTA_ELEV) up = false;
 			else cam.translateY(ELEV);
 		}
 		else if(down) {
-			if(cam.position.y < 20.0) {
+			if(cam.position.y < 100.0) {
 				down = false;
 			}
 			else {
-				if(cam.position.y < lastElevation - 50.0) down = false;
+				if(cam.position.y < lastElevation - DELTA_ELEV) down = false;
 				else cam.translateY(-ELEV);
 			}
 		}
@@ -134,12 +161,14 @@ $(document).ready(function() {
 	}
 	
 	function stop(msg) {
+		renderer.setClearColor({ color: 0x000000 });
+		renderer.clearColor(true, false, false);
 		document.removeEventListener('keydown', doKeyDown);
 		document.removeEventListener('keyup', doKeyUp);
 		document.addEventListener('keydown', doEnter, false);
 		
 		scene.remove.apply(scene, scene.children);
-		orbs = [];
+		drops = [];
 		
 		scoreCount = 0;
 		
@@ -160,8 +189,33 @@ $(document).ready(function() {
 	/*****************************************************************************************************************/
 	/* UTILS */
 	
+	function newDrop() {
+		deliver = true;
+		pkg.visible = false;
+		
+		dropIndex = getRandomInt(0, drops.length - 1);
+		dropX = drops[dropIndex].center.x;
+		dropY = drops[dropIndex].center.y;
+		dropZ = drops[dropIndex].center.z;
+		dropRadius = drops[dropIndex].radius;
+		dropName = drops[dropIndex].name;
+		
+		toEnable = scene.getObjectByName(dropName);
+        toEnable.visible = true;
+	}
+	
+	function newPkg() {
+		deliver = false;
+		pkg.visible = true;
+	}
+	
+	function getRandomInt(min, max) {
+		min = Math.ceil(min);
+		max = Math.floor(max);
+		return Math.floor(Math.random() * (max - min + 1)) + min; 
+	}
+	
 	document.addEventListener('keydown', doEnter, false);
-
 	function doEnter(event) {
 		if(event.keyCode == 13) {
 			document.removeEventListener('keydown', doEnter);
@@ -291,6 +345,7 @@ $(document).ready(function() {
 	/* INIT */
 	
 	function init() {
+		scene.remove.apply(scene, scene.children);
 		document.addEventListener('keydown', doKeyDown, false);
 		document.addEventListener('keyup', doKeyUp, false);
 		controls.html(
@@ -300,14 +355,17 @@ $(document).ready(function() {
 		BOOST = -10.0;
 		MOVE_FB = 0;
 		MOVE_LR = 0;
-		DELTA_MOVE = 0.2;
+		DELTA_MOVE = 0.4;
 		ROT = 0;
-		DELTA_ROT = 0.00025;
-		ELEV = 1.0;
+		DELTA_ROT = 0.001;
+		ELEV = 4.0;
+		DELTA_ELEV = 100.0;
 		
 		initScene();
 		initGround();
 		initSky();
+		initPkg();
+		initDrops();
 		
 		renderer.render(scene, cam);
 		render();
@@ -315,8 +373,8 @@ $(document).ready(function() {
 	
 	function initScene() {
 		cam.position.x = 0;
-		cam.position.y = 200;
-		cam.position.z = -400;
+		cam.position.y = 400;
+		cam.position.z = -4500;
 		scene.add(cam);
 		scene.add(lightAmbient);
 		scene.add(lightSun);
@@ -347,5 +405,69 @@ $(document).ready(function() {
 		sky.rotation.set(Math.PI/2, 0, 0);
 		grid.position.y += 4999;
 		scene.add(sky);
+	}
+	
+	function initDrops() {
+		for(var i = 0; i < 5; i++) {
+			var geoDrop = new THREE.SphereGeometry(100, 32, 32);
+			var matDrop = new THREE.MeshLambertMaterial({ color: 0xccff00, transparent: true, alphaTest: 0.5 });
+			matDrop.transparent = true;
+			matDrop.opacity = 0.5;
+			var drop = new THREE.Mesh(geoDrop, matDrop);
+			drop.name = "d" + i;
+			drop.position.x = 1000; 
+			drop.position.y = -40.0;
+			drop.position.z = i * 1500 - 3000;
+			drop.needsUpdate = true;
+			
+			scene.add(drop);
+			drop.visible = false;
+			
+			var sphere = new THREE.Sphere(drop.position, 100);
+			sphere.name = drop.name;
+			drops.push(sphere);
+		}
+		
+		for(var i = 5; i < 10; i++) {
+			var geoDrop = new THREE.SphereGeometry(100, 32, 32);
+			var matDrop = new THREE.MeshLambertMaterial({ color: 0xccff00, transparent: true, alphaTest: 0.5 });
+			matDrop.transparent = true;
+			matDrop.opacity = 0.5;
+			var drop = new THREE.Mesh(geoDrop, matDrop);
+			drop.name = "d" + i;
+			drop.position.x = -1000; 
+			drop.position.y = -40.0;
+			drop.position.z = (i - 5) * 1500 - 3000;
+			drop.needsUpdate = true;
+			
+			scene.add(drop);
+			drop.visible = false;
+			
+			var sphere = new THREE.Sphere(drop.position, 100);
+			sphere.name = drop.name;
+			drops.push(sphere);
+		}
+		
+		newDrop();
+		cam.lookAt(new THREE.Vector3(cam.position.x, cam.position.y, cam.position.z + 1000));
+	}
+	
+	function initPkg() {
+		var geoPackage = new THREE.SphereGeometry(100, 32, 32);
+		var matPackage = new THREE.MeshLambertMaterial({ color: 0xccff00, transparent: true, alphaTest: 0.5 });
+		matPackage.transparent = true;
+		matPackage.opacity = 0.5;
+		pkg = new THREE.Mesh(geoPackage, matPackage);
+		pkg.name = "pkg";
+		pkg.position.x = 0; 
+		pkg.position.y = 300;
+		pkg.position.z = -4500;
+		pkg.needsUpdate = true;
+		
+		scene.add(pkg);
+		pkg.visible = false;
+		
+		pkgSphere = new THREE.Sphere(pkg.position, 100);
+		pkgSphere.name = pkg.name;
 	}
 });
