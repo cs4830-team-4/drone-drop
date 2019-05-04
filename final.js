@@ -10,7 +10,7 @@ $(document).ready(function() {
 	//Renderer, scene
 	var width = window.innerWidth;
 	var height = window.innerHeight;
-	var renderer = new THREE.WebGLRenderer({ antialias : true });
+	var renderer = new THREE.WebGLRenderer({ antialias : false, precision: "lowp" });
 	renderer.setSize(width, height);
 	document.body.appendChild(renderer.domElement);
 	var scene = new THREE.Scene;
@@ -24,57 +24,64 @@ $(document).ready(function() {
 	var lightSun = new THREE.PointLight(0xaabbcc);
 	lightSun.position.set(0, 1000, 18);
 	
+	//Geometry Data
+	var RADIUS = 100;
+	var dropIndex, dropX, dropY, dropZ, dropName;
+	var pkg, pkgPosition;
+	
 	//Control Data
 	var forw, back, left, right, rotLeft, rotRight, up, down, boost;
 	var wasForw, wasBack, wasLeft, wasRight, wasRotLeft, wasRotRight, wasUp, wasDown;
 	var BOOST, MOVE_FB, MOVE_LR, DELTA_MOVE, ROT, DELTA_ROT, ELEV, DELTA_ELEV, ELEV_OFF;
 	var lastElevation;
 	
-	//Deliveries, score
+	//Game Data
+	var frame = 0;
 	var drops = [];
 	var toEnable, toRemove;
 	var scoreCount = 0;
 	var NUMDROPS = 10;
-	var dropIndex, dropX, dropY, dropZ, dropRadius, dropName;
-	var pkg, pkgSphere;
 	var deliver = true;
 	
 	/*****************************************************************************************************************/
 	/* GAME LOOP */
 	
 	function render() {
-		
-		//Collisions
-		if(	deliver &&
-			MOVE_FB > -5.0 &&
-			Math.abs(cam.position.x - dropX) < dropRadius &&
-			Math.abs(cam.position.y - dropY) < dropRadius + 50 &&
-			Math.abs(cam.position.z - dropZ) < dropRadius) {
-				toRemove = scene.getObjectByName(dropName);
-		        scene.remove(toRemove);
-		        drops.splice(dropIndex, 1);
-				scoreCount++;
-				score.html("Drops: " + scoreCount + "/" + NUMDROPS);
-				if(scoreCount == NUMDROPS) {
-					stop("DONE! ENTER TO RESET");
-					return;
-				}
-				newPkg();
+		frame++;
+		if(frame % 10 == 0) {
+			//Collisions
+			if(	deliver &&
+				MOVE_FB > -5.0 &&
+				Math.abs(cam.position.x - dropX) < RADIUS &&
+				Math.abs(cam.position.y - dropY) < RADIUS + 50 &&
+				Math.abs(cam.position.z - dropZ) < RADIUS) {
+					toRemove = scene.getObjectByName(dropName);
+			        scene.remove(toRemove);
+			        drops.splice(dropIndex, 1);
+					scoreCount++;
+					score.html("Drops: " + scoreCount + "/" + NUMDROPS);
+					if(scoreCount == NUMDROPS) {
+						stop("DONE! ENTER TO RESET");
+						return;
+					}
+					newPkg();
+			}
+			else if(
+				!deliver &&
+				MOVE_FB > -5.0 &&
+				Math.abs(cam.position.x - pkgPosition.x) < RADIUS &&
+				Math.abs(cam.position.y - pkgPosition.y) < RADIUS &&
+				Math.abs(cam.position.z - pkgPosition.z) < RADIUS) {
+					selectDrop();
+			}
+			frame = 0;
 		}
-		else if(
-			!deliver &&
-			MOVE_FB > -5.0 &&
-			Math.abs(cam.position.x - pkg.position.x) < pkgSphere.radius &&
-			Math.abs(cam.position.y - pkg.position.y) < pkgSphere.radius &&
-			Math.abs(cam.position.z - pkg.position.z) < pkgSphere.radius) {
-				newDrop();
-		}
-		
+			
 		/*
 		stop("OOPS! ENTER TO RESTART");
 		return;
 		*/
-		
+			
 		//Move - Forward & Backward
 		if(wasForw) {
 			cam.translateZ(MOVE_FB);
@@ -189,15 +196,34 @@ $(document).ready(function() {
 	/*****************************************************************************************************************/
 	/* UTILS */
 	
-	function newDrop() {
+	function newHouse(dropX, dropZ, offX, offZ, rotX, rotZ) {
+		var loader = new THREE.MTLLoader()
+		.setPath('models/')
+		.load('polHouse1.mtl', function (materials) {
+			materials.preload();
+			new THREE.OBJLoader()
+				.setMaterials(materials)
+				.setPath('models/')
+				.load('polHouse1.obj', function (house) {
+					house.position.x = dropX + offX;
+					house.position.y = 0;
+					house.position.z = dropZ + offZ;
+					house.scale.set(10, 10, 10);
+					house.rotation.x = rotX;
+					house.rotation.z = rotZ;
+					scene.add(house);
+				});
+		});
+	}
+	
+	function selectDrop() {
 		deliver = true;
 		pkg.visible = false;
 		
 		dropIndex = getRandomInt(0, drops.length - 1);
-		dropX = drops[dropIndex].center.x;
-		dropY = drops[dropIndex].center.y;
-		dropZ = drops[dropIndex].center.z;
-		dropRadius = drops[dropIndex].radius;
+		dropX = drops[dropIndex].x;
+		dropY = drops[dropIndex].y;
+		dropZ = drops[dropIndex].z;
 		dropName = drops[dropIndex].name;
 		
 		toEnable = scene.getObjectByName(dropName);
@@ -362,9 +388,11 @@ $(document).ready(function() {
 		DELTA_ELEV = 100.0;
 		
 		initScene();
+		//initGrids();
 		initGround();
-		initSky();
+		//initSky();
 		initPkg();
+		initTruck();
 		initDrops();
 		
 		renderer.render(scene, cam);
@@ -372,6 +400,9 @@ $(document).ready(function() {
 	}
 	
 	function initScene() {
+		while(scene.children.length > 0){ 
+		    scene.remove(scene.children[0]); 
+		}
 		cam.position.x = 0;
 		cam.position.y = 400;
 		cam.position.z = -4500;
@@ -380,13 +411,24 @@ $(document).ready(function() {
 		scene.add(lightSun);
 	}
 	
+	function initGrids() {
+		var gridGround = new THREE.GridHelper(10000, 50, 0xff0000, 0xcccccc);
+		gridGround.position.y += 1;
+		scene.add(gridGround);
+		
+		var gridSky = new THREE.GridHelper(10000, 50, 0xff0000, 0xcccccc);
+		grid.position.y += 4999;
+		scene.add(gridSky);
+	}
+	
 	function initGround() {
-		var grid = new THREE.GridHelper(10000, 50, 0xff0000, 0xcccccc);
-		grid.position.y += 1;
-		scene.add(grid);
+		var texture = new THREE.TextureLoader().load( 'grass.jpg' );
+		
+		texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+		texture.repeat.set(100, 100);
 		
 		var geoGround = new THREE.PlaneBufferGeometry(10000, 10000);
-		var matGround = new THREE.MeshBasicMaterial({ color: 0xffffff });
+		var matGround = new THREE.MeshBasicMaterial({ map: texture });
 		
 		var ground = new THREE.Mesh(geoGround, matGround);
 		ground.rotation.set(Math.PI/-2, 0, 0);
@@ -394,25 +436,19 @@ $(document).ready(function() {
 	}
 	
 	function initSky() {
-		var grid = new THREE.GridHelper(10000, 50, 0xff0000, 0xcccccc);
-		scene.add(grid);
-		
 		var geoSky = new THREE.PlaneBufferGeometry(10000, 10000);
 		var matSky = new THREE.MeshBasicMaterial({ color: 0x7ec0ee });
 		
 		var sky = new THREE.Mesh(geoSky, matSky);
 		sky.position.y = 5000;
 		sky.rotation.set(Math.PI/2, 0, 0);
-		grid.position.y += 4999;
 		scene.add(sky);
 	}
 	
 	function initDrops() {
 		for(var i = 0; i < 5; i++) {
-			var geoDrop = new THREE.SphereGeometry(100, 32, 32);
-			var matDrop = new THREE.MeshLambertMaterial({ color: 0xccff00, transparent: true, alphaTest: 0.5 });
-			matDrop.transparent = true;
-			matDrop.opacity = 0.5;
+			var geoDrop = new THREE.SphereGeometry(RADIUS, 16, 16);
+			var matDrop = new THREE.MeshLambertMaterial({ color: 0xccff00 });
 			var drop = new THREE.Mesh(geoDrop, matDrop);
 			drop.name = "d" + i;
 			drop.position.x = 1000; 
@@ -420,19 +456,19 @@ $(document).ready(function() {
 			drop.position.z = i * 1500 - 3000;
 			drop.needsUpdate = true;
 			
+			newHouse(drop.position.x, drop.position.z, 250, 100, -Math.PI / 2, -Math.PI / 2);
+			
 			scene.add(drop);
 			drop.visible = false;
 			
-			var sphere = new THREE.Sphere(drop.position, 100);
-			sphere.name = drop.name;
-			drops.push(sphere);
+			var position = drop.position;
+			position.name = drop.name;
+			drops.push(position);
 		}
 		
 		for(var i = 5; i < 10; i++) {
-			var geoDrop = new THREE.SphereGeometry(100, 32, 32);
-			var matDrop = new THREE.MeshLambertMaterial({ color: 0xccff00, transparent: true, alphaTest: 0.5 });
-			matDrop.transparent = true;
-			matDrop.opacity = 0.5;
+			var geoDrop = new THREE.SphereGeometry(RADIUS, 16, 16);
+			var matDrop = new THREE.MeshLambertMaterial({ color: 0xccff00 });
 			var drop = new THREE.Mesh(geoDrop, matDrop);
 			drop.name = "d" + i;
 			drop.position.x = -1000; 
@@ -440,23 +476,23 @@ $(document).ready(function() {
 			drop.position.z = (i - 5) * 1500 - 3000;
 			drop.needsUpdate = true;
 			
+			newHouse(drop.position.x, drop.position.z, -250, -100, -Math.PI / 2, Math.PI / 2);
+			
 			scene.add(drop);
 			drop.visible = false;
 			
-			var sphere = new THREE.Sphere(drop.position, 100);
-			sphere.name = drop.name;
-			drops.push(sphere);
+			var position = drop.position;
+			position.name = drop.name;
+			drops.push(position);
 		}
 		
-		newDrop();
+		selectDrop();
 		cam.lookAt(new THREE.Vector3(cam.position.x, cam.position.y, cam.position.z + 1000));
 	}
 	
 	function initPkg() {
-		var geoPackage = new THREE.SphereGeometry(100, 32, 32);
-		var matPackage = new THREE.MeshLambertMaterial({ color: 0xccff00, transparent: true, alphaTest: 0.5 });
-		matPackage.transparent = true;
-		matPackage.opacity = 0.5;
+		var geoPackage = new THREE.SphereGeometry(RADIUS, 16, 16);
+		var matPackage = new THREE.MeshLambertMaterial({ color: 0xccff00 });
 		pkg = new THREE.Mesh(geoPackage, matPackage);
 		pkg.name = "pkg";
 		pkg.position.x = 0; 
@@ -467,7 +503,27 @@ $(document).ready(function() {
 		scene.add(pkg);
 		pkg.visible = false;
 		
-		pkgSphere = new THREE.Sphere(pkg.position, 100);
-		pkgSphere.name = pkg.name;
+		pkgPosition = pkg.position;
+		pkgPosition.name = pkg.name;
+	}
+	
+	function initTruck() {
+		var loader = new THREE.MTLLoader()
+		.setPath('models/')
+		.load('truck.mtl', function (materials) {
+			materials.preload();
+			new THREE.OBJLoader()
+				.setMaterials(materials)
+				.setPath('models/')
+				.load('truck.obj', function (truck) {
+					truck.position.x = pkgPosition.x;
+					truck.position.y = 0;
+					truck.position.z = pkgPosition.z;
+					truck.scale.set(120, 120, 120);
+					//truck.rotation.x = rotX;
+					//truck.rotation.z = rotZ;
+					scene.add(truck);
+				});
+		});
 	}
 });
