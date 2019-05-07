@@ -6,6 +6,7 @@ $(document).ready(function() {
 	var reticle = $("#reticle");
 	var score = $("#score");
 	var controls = $("#controls");
+	var position = $("#position");
 	
 	//Renderer, scene
 	var width = window.innerWidth;
@@ -48,8 +49,9 @@ $(document).ready(function() {
 	
 	function render() {
 		frame++;
+		
+		//Drop collisions
 		if(frame % 10 == 0) {
-			//Collisions
 			if(	deliver &&
 				MOVE_FB > -5.0 &&
 				Math.abs(cam.position.x - dropX) < RADIUS &&
@@ -70,17 +72,62 @@ $(document).ready(function() {
 				!deliver &&
 				MOVE_FB > -5.0 &&
 				Math.abs(cam.position.x - pkgPosition.x) < RADIUS &&
-				Math.abs(cam.position.y - pkgPosition.y) < RADIUS &&
+				Math.abs(cam.position.y - pkgPosition.y) < RADIUS + 20 &&
 				Math.abs(cam.position.z - pkgPosition.z) < RADIUS) {
 					selectDrop();
 			}
 			frame = 0;
 		}
-			
-		/*
-		stop("OOPS! ENTER TO RESTART");
-		return;
-		*/
+		
+		//House collisions
+		if(cam.position.y < 220 && cam.position.y > 0) {
+			if((cam.position.x < -1190 && cam.position.x > -1620) || (cam.position.x < 1620 && cam.position.x > 1190)){
+				if(cam.position.z < -2540 && cam.position.z > -3480) {
+					stop("OOPS! ENTER TO RESTART");
+					return;
+				}
+				else if(cam.position.z < -1040 && cam.position.z > -1980) {
+					stop("OOPS! ENTER TO RESTART");
+					return;
+				}
+				else if(cam.position.z < 460 && cam.position.z > -480) {
+					stop("OOPS! ENTER TO RESTART");
+					return;
+				}
+				else if(cam.position.z < 1950 && cam.position.z > 1020) {
+					stop("OOPS! ENTER TO RESTART");
+					return;
+				}
+				else if(cam.position.z < 3460 && cam.position.z > 2520) {
+					stop("OOPS! ENTER TO RESTART");
+					return;
+				}
+			}
+		}
+		else if(cam.position.y < 380 && cam.position.y > 220) {
+			if((cam.position.x < -1260 && cam.position.x > -1540) || (cam.position.x < 1540 && cam.position.x > 1260)){
+				if(cam.position.z < -2540 && cam.position.z > -3480) {
+					stop("OOPS! ENTER TO RESTART");
+					return;
+				}
+				else if(cam.position.z < -1040 && cam.position.z > -1980) {
+					stop("OOPS! ENTER TO RESTART");
+					return;
+				}
+				else if(cam.position.z < 460 && cam.position.z > -480) {
+					stop("OOPS! ENTER TO RESTART");
+					return;
+				}
+				else if(cam.position.z < 1950 && cam.position.z > 1020) {
+					stop("OOPS! ENTER TO RESTART");
+					return;
+				}
+				else if(cam.position.z < 3460 && cam.position.z > 2520) {
+					stop("OOPS! ENTER TO RESTART");
+					return;
+				}
+			}	
+		}
 			
 		//Move - Forward & Backward
 		if(wasForw) {
@@ -163,6 +210,8 @@ $(document).ready(function() {
 			}
 		}
 		
+		position.html("x: " + cam.position.x + "y: " + cam.position.y);
+		
 		renderer.render(scene, cam);
 		requestAnimationFrame(render);
 	}
@@ -195,27 +244,6 @@ $(document).ready(function() {
 	
 	/*****************************************************************************************************************/
 	/* UTILS */
-	
-	function newHouse(dropX, dropZ, offX, offZ, rotX, rotZ) {
-		var loader = new THREE.MTLLoader()
-		.setPath('models/')
-		.load('polHouse1.mtl', function (materials) {
-			materials.preload();
-			new THREE.OBJLoader()
-				.setMaterials(materials)
-				.setPath('models/')
-				.load('polHouse1.obj', function (house) {
-					house.position.x = dropX + offX;
-					house.position.y = 0;
-					house.position.z = dropZ + offZ;
-					house.scale.set(10, 10, 10);
-					house.rotation.x = rotX;
-					house.rotation.z = rotZ;
-					scene.add(house);
-				});
-		});
-	}
-	
 	function selectDrop() {
 		deliver = true;
 		pkg.visible = false;
@@ -456,7 +484,9 @@ $(document).ready(function() {
 			drop.position.z = i * 1500 - 3000;
 			drop.needsUpdate = true;
 			
-			newHouse(drop.position.x, drop.position.z, 250, 100, -Math.PI / 2, -Math.PI / 2);
+			initHouse(drop.position.x, drop.position.z, 250, -Math.PI / 2, -Math.PI / 2);
+			
+			drop.position.z -= 100;
 			
 			scene.add(drop);
 			drop.visible = false;
@@ -476,7 +506,9 @@ $(document).ready(function() {
 			drop.position.z = (i - 5) * 1500 - 3000;
 			drop.needsUpdate = true;
 			
-			newHouse(drop.position.x, drop.position.z, -250, -100, -Math.PI / 2, Math.PI / 2);
+			initHouse(drop.position.x, drop.position.z, -250, -Math.PI / 2, Math.PI / 2);
+			
+			drop.position.z += 100;
 			
 			scene.add(drop);
 			drop.visible = false;
@@ -490,13 +522,33 @@ $(document).ready(function() {
 		cam.lookAt(new THREE.Vector3(cam.position.x, cam.position.y, cam.position.z + 1000));
 	}
 	
+	function initHouse(dropX, dropZ, offX, rotX, rotZ) {
+		var loader = new THREE.MTLLoader()
+		.setPath('models/')
+		.load('polHouse1.mtl', function (materials) {
+			materials.preload();
+			new THREE.OBJLoader()
+				.setMaterials(materials)
+				.setPath('models/')
+				.load('polHouse1.obj', function (house) {
+					house.position.x = dropX + offX;
+					house.position.y = 0;
+					house.position.z = dropZ;
+					house.scale.set(10, 10, 10);
+					house.rotation.x = rotX;
+					house.rotation.z = rotZ;
+					scene.add(house);
+				});
+		});
+	}
+	
 	function initPkg() {
 		var geoPackage = new THREE.SphereGeometry(RADIUS, 16, 16);
 		var matPackage = new THREE.MeshLambertMaterial({ color: 0xccff00 });
 		pkg = new THREE.Mesh(geoPackage, matPackage);
 		pkg.name = "pkg";
 		pkg.position.x = 0; 
-		pkg.position.y = 300;
+		pkg.position.y = 250;
 		pkg.position.z = -4500;
 		pkg.needsUpdate = true;
 		

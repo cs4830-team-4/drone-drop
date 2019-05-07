@@ -72,3 +72,16 @@ p {
 	font-family: monospace;
 	color: #000000;
 }
+
+#position {
+	position: absolute;
+	z-index: 99;
+	left: 2%;
+	bottom: 2%;
+	margin: 0;
+	padding: 0;
+	font-weight: bold;
+	font-size: 14pt;
+	font-family: monospace;
+	color: #000000;
+}
