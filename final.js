@@ -6,7 +6,6 @@ $(document).ready(function() {
 	var reticle = $("#reticle");
 	var score = $("#score");
 	var controls = $("#controls");
-	var position = $("#position");
 	
 	//Renderer, scene
 	var width = window.innerWidth;
@@ -209,8 +208,6 @@ $(document).ready(function() {
 				else cam.translateY(-ELEV);
 			}
 		}
-		
-		position.html("x: " + cam.position.x + "y: " + cam.position.y);
 		
 		renderer.render(scene, cam);
 		requestAnimationFrame(render);
